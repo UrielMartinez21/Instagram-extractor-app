@@ -161,3 +161,9 @@ cython_debug/
 
 # Flet
 storage/
+
+# VS Code
+.vscode/
+
+instagram_data/
+sessions/
