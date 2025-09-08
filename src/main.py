@@ -238,6 +238,229 @@ def main(page: ft.Page):
     page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.padding = 20
 
+    # =====================| Helpers |======================
+    def get_json_files_for_account(account_name):
+        """Busca todos los archivos JSON relacionados con una cuenta específica"""
+        if not account_name.strip():
+            return []
+        
+        try:
+            json_files = []
+            # Buscar archivos que contengan el nombre de la cuenta
+            for file_path in data_dir.glob("*.json"):
+                filename = file_path.name
+                # Verificar si el archivo corresponde a la cuenta buscada
+                if filename.startswith(f"{account_name}_data_"):
+                    # Extraer información del archivo
+                    try:
+                        # Formato esperado: account_data_YYYYMMDDHHMM.json
+                        timestamp_part = filename.replace(f"{account_name}_data_", "").replace(".json", "")
+                        # Formatear la fecha para mostrar
+                        if len(timestamp_part) == 12:  # YYYYMMDDHHMM
+                            year = timestamp_part[:4]
+                            month = timestamp_part[4:6]
+                            day = timestamp_part[6:8]
+                            hour = timestamp_part[8:10]
+                            minute = timestamp_part[10:12]
+                            formatted_date = f"{day}/{month}/{year} {hour}:{minute}"
+                            
+                            json_files.append({
+                                'filename': filename,
+                                'path': str(file_path),
+                                'display_name': f"{formatted_date} - {filename}",
+                                'timestamp': timestamp_part
+                            })
+                    except Exception as e:
+                        # Si no se puede parsear la fecha, agregar el archivo de todas formas
+                        json_files.append({
+                            'filename': filename,
+                            'path': str(file_path),
+                            'display_name': filename,
+                            'timestamp': ""
+                        })
+            
+            # Ordenar por timestamp (más reciente primero)
+            json_files.sort(key=lambda x: x['timestamp'], reverse=True)
+            return json_files
+            
+        except Exception as e:
+            logger.error(f"Error buscando archivos para {account_name}: {e}")
+            return []
+
+
+    def load_json_file(file_path):
+        """Carga y valida un archivo JSON"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # Validar que tenga la estructura esperada
+            required_keys = ['account', 'followers', 'following', 'extraction_date']
+            for key in required_keys:
+                if key not in data:
+                    raise ValueError(f"El archivo no tiene la estructura esperada. Falta la clave: {key}")
+
+            return data
+
+        except json.JSONDecodeError:
+            raise ValueError("El archivo no es un JSON válido")
+        except Exception as e:
+            raise ValueError(f"Error cargando el archivo: {str(e)}")
+
+    def on_account_name_change(e):
+        """Se ejecuta cuando cambia el texto del campo de cuenta"""
+        account_name = account_name_field.value.strip()
+        
+        if not account_name:
+            # Limpiar el multiselect si no hay texto
+            file_selector.options = []
+            file_selector.update()
+            return
+        
+        # Buscar archivos relacionados
+        json_files = get_json_files_for_account(account_name)
+        
+        # Actualizar las opciones del multiselect
+        if json_files:
+            file_selector.options = [
+                ft.dropdown.Option(
+                    key=file_info['path'],
+                    text=file_info['display_name']
+                ) for file_info in json_files
+            ]
+            files_found_text.value = f"✅ {len(json_files)} archivo(s) encontrado(s)"
+            files_found_text.color = ft.Colors.GREEN_700
+        else:
+            file_selector.options = []
+            files_found_text.value = f"❌ No se encontraron archivos para '{account_name}'"
+            files_found_text.color = ft.Colors.RED_700
+        
+        # Limpiar selección previa
+        file_selector.value = None
+        file_selector.update()
+        files_found_text.update()
+
+    def load_and_display_file(e):
+        """Carga el archivo seleccionado y muestra los datos"""
+        account_name = account_name_field.value.strip()
+        selected_file = file_selector.value
+        
+        if not account_name:
+            load_results_container.content.controls[0].value = "❌ Por favor, ingresa el nombre de la cuenta."
+            load_results_container.update()
+            return
+        
+        if not selected_file:
+            load_results_container.content.controls[0].value = "❌ Por favor, selecciona un archivo."
+            load_results_container.update()
+            return
+        
+        try:
+            # Mostrar mensaje de carga
+            load_results_container.content.controls[0].value = "⏳ Cargando archivo..."
+            load_results_container.update()
+            
+            # Cargar el archivo JSON
+            data = load_json_file(selected_file)
+            
+            # Usar las mismas funciones que en data mining para mostrar los datos
+            formatted_info = format_json_data(data)
+            followers_text, following_text = create_expandable_lists(data)
+            
+            # Crear contenedores para las pestañas
+            followers_container = ft.Container(
+                content=ft.Text(
+                    followers_text,
+                    size=11,
+                    color=ft.Colors.BLACK87,
+                    selectable=True
+                ),
+                padding=ft.padding.all(15),
+                bgcolor=ft.Colors.GREEN_50,
+                border_radius=8,
+                border=ft.border.all(1, ft.Colors.GREEN_200),
+                height=300,
+            )
+
+            following_container = ft.Container(
+                content=ft.Text(
+                    following_text,
+                    size=11,
+                    color=ft.Colors.BLACK87,
+                    selectable=True
+                ),
+                padding=ft.padding.all(15),
+                bgcolor=ft.Colors.ORANGE_50,
+                border_radius=8,
+                border=ft.border.all(1, ft.Colors.ORANGE_200),
+                height=300,
+            )
+
+            # Crear las pestañas
+            tabs_container = ft.Tabs(
+                selected_index=0,
+                animation_duration=300,
+                tabs=[
+                    ft.Tab(
+                        text=f"👥 Seguidores ({len(data.get('followers', []))})",
+                        content=followers_container
+                    ),
+                    ft.Tab(
+                        text=f"➡️ Siguiendo ({len(data.get('following', []))})",
+                        content=following_container
+                    )
+                ],
+                height=350
+            )
+
+            # Actualizar el contenedor de resultados
+            load_results_container.content = ft.Column([
+                # Información del archivo cargado
+                ft.Container(
+                    content=ft.Text(
+                        f"📁 Archivo cargado: {Path(selected_file).name}",
+                        size=14,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.PURPLE_800
+                    ),
+                    padding=ft.padding.all(10),
+                    border_radius=8,
+                    bgcolor=ft.Colors.PURPLE_50,
+                    border=ft.border.all(1, ft.Colors.PURPLE_200),
+                    margin=ft.margin.only(bottom=10)
+                ),
+                
+                # Información principal
+                ft.Container(
+                    content=ft.Text(
+                        formatted_info,
+                        size=12,
+                        color=ft.Colors.BLACK87,
+                        font_family="monospace"
+                    ),
+                    padding=ft.padding.all(15),
+                    border_radius=8,
+                    bgcolor=ft.Colors.BLUE_50,
+                    border=ft.border.all(1, ft.Colors.BLUE_200),
+                    margin=ft.margin.only(bottom=15)
+                ),
+                
+                # Pestañas
+                tabs_container
+                
+            ], 
+            scroll=ft.ScrollMode.AUTO,
+            spacing=10
+            )
+            
+        except Exception as e:
+            error_message = f"❌ Error cargando el archivo: {str(e)}"
+            load_results_container.content.controls[0].value = error_message
+            load_results_container.content.controls[0].color = ft.Colors.RED_700
+        
+        load_results_container.update()
+
+
     # =====================| Navigation Functions |======================
     def show_data_mine_section(e):
         page.clean()
@@ -273,19 +496,20 @@ def main(page: ft.Page):
             bgcolor=ft.Colors.GREY_500,
             color=ft.Colors.WHITE,
         )
-        # -> Layout de data mining
-        data_load_layout = ft.Column(
+
+        # -> Layout de load file
+        load_file_layout = ft.Column(
             [
                 back_button,
                 ft.Container(height=15),
                 ft.Row(
-                    [form_container, ft.Container(width=40), results_container],
+                    [load_form_container, ft.Container(width=40), load_results_container],
                     alignment=ft.MainAxisAlignment.CENTER,
                 ),
             ]
         )
 
-        page.add(data_load_layout)
+        page.add(load_file_layout)
         page.update()
 
     def show_main_menu_section(e):
@@ -507,6 +731,83 @@ def main(page: ft.Page):
                     width=300,
                     height=45,
                     bgcolor=ft.Colors.BLUE_600,
+                    color=ft.Colors.WHITE,
+                ),
+            ],
+        ),
+        width=350,
+        padding=20,
+        border_radius=8,
+        bgcolor=ft.Colors.WHITE,
+    )
+
+    # =====================| Load File Form Components |======================
+    # Campo para el nombre de la cuenta
+    account_name_field = ft.TextField(
+        label="Nombre de la cuenta (sin @)",
+        hint_text="Ejemplo: mar_tz_ml",
+        width=300,
+        border_radius=8,
+        on_change=on_account_name_change,  # Se ejecuta cada vez que cambia el texto
+    )
+
+    # Texto para mostrar cuántos archivos se encontraron
+    files_found_text = ft.Text(
+        "Ingresa un nombre de cuenta para buscar archivos",
+        size=12,
+        color=ft.Colors.GREY_600
+    )
+
+    # Selector de archivos
+    file_selector = ft.Dropdown(
+        label="Seleccionar archivo",
+        width=300,
+        options=[],  # Se llena dinámicamente
+        border_radius=8,
+    )
+
+    # Contenedor de resultados para load file
+    load_results_container = ft.Container(
+        content=ft.Column(
+            [
+                ft.Text(
+                    "Selecciona un archivo para ver los datos",
+                    size=16,
+                    color=ft.Colors.GREY_600,
+                    text_align=ft.TextAlign.CENTER,
+                )
+            ]
+        ),
+        width=500,
+        height=500,
+        padding=20,
+        border_radius=8,
+        bgcolor=ft.Colors.GREY_50,
+    )
+
+    # Formulario de load file
+    load_form_container = ft.Container(
+        content=ft.Column(
+            [
+                ft.Text(
+                    "📁 Cargar Archivo",
+                    size=20,
+                    weight=ft.FontWeight.BOLD,
+                    color=ft.Colors.GREEN_800,
+                ),
+                ft.Container(height=20),
+                account_name_field,
+                ft.Container(height=10),
+                files_found_text,
+                ft.Container(height=15),
+                file_selector,
+                ft.Container(height=20),
+                ft.ElevatedButton(
+                    "Cargar y Mostrar",
+                    on_click=load_and_display_file,
+                    width=300,
+                    height=45,
+                    bgcolor=ft.Colors.GREEN_600,
                     color=ft.Colors.WHITE,
                 ),
             ],
