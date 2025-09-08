@@ -6,7 +6,6 @@ import os
 from instagrapi import Client
 from datetime import datetime
 import time
-import glob
 
 
 # =====================| DIRECTORIES |=====================
