@@ -145,3 +145,55 @@ def format_comparison_data(comparison: dict) -> str:
         """
 
         return formatted_text
+
+
+def create_comparison_lists(comparison):
+    """Crea las listas para mostrar en las pestañas de comparación"""
+    changes = comparison['changes']
+    relationships = comparison['current_relationships']
+    
+    # Nuevos seguidores
+    new_followers_text = "\n".join([f"• @{username}" for username in changes['new_followers']]) if changes['new_followers'] else "No hay nuevos seguidores"
+    
+    # Seguidores perdidos
+    lost_followers_text = "\n".join([f"• @{username}" for username in changes['lost_followers']]) if changes['lost_followers'] else "No se perdieron seguidores"
+    
+    # Nuevos seguidos
+    new_following_text = "\n".join([f"• @{username}" for username in changes['new_following']]) if changes['new_following'] else "No hay nuevos seguidos"
+    
+    # Dejó de seguir
+    unfollowed_text = "\n".join([f"• @{username}" for username in changes['unfollowed']]) if changes['unfollowed'] else "No dejó de seguir a nadie"
+    
+    # Seguimiento mutuo
+    mutual_follows_text = "\n".join([f"• @{username}" for username in relationships['mutual_follows']]) if relationships['mutual_follows'] else "No hay seguimiento mutuo"
+    
+    # Sigue pero no lo siguen
+    follows_not_followed_text = "\n".join([f"• @{username}" for username in relationships['follows_but_not_followed']]) if relationships['follows_but_not_followed'] else "Todos los que sigue lo siguen de vuelta"
+    
+    return {
+        'new_followers': new_followers_text,
+        'lost_followers': lost_followers_text,
+        'new_following': new_following_text,
+        'unfollowed': unfollowed_text,
+        'mutual_follows': mutual_follows_text,
+        'follows_not_followed': follows_not_followed_text
+    }
+
+
+def create_expandable_lists(data):
+        followers = data.get('followers', [])
+        following = data.get('following', [])
+        
+        # Mostrar todos los seguidores (no solo preview)
+        if followers:
+            followers_text = "\n".join([f"• @{username}" for username in followers])
+        else:
+            followers_text = "No hay seguidores disponibles"
+
+        # Mostrar todos los siguiendo (no solo preview)  
+        if following:
+            following_text = "\n".join([f"• @{username}" for username in following])
+        else:
+            following_text = "No hay usuarios seguidos disponibles"
+        
+        return followers_text, following_text

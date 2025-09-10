@@ -1,10 +1,14 @@
 import flet as ft
 from pathlib import Path
 
+from components.load_file_component import account_name_field_component, file_selector_component, files_found_text_component, load_form_container_component, load_results_container_component
+from components.menu import main_menu_component
+from components.analyze_data import analyze_account_name_field_component, analyze_file1_selector_component, analyze_file2_selector_component, analyze_files_found_text_component, analyze_form_container_component, analyze_results_container_component
+
 from config.settings import setup_logger
 from core.instagram_comparator import InstagramComparator
 from core.instagram_extractor import SimpleInstagramExtractor
-from utils.helpers import get_json_files_for_account, load_json_file ,format_json_data, format_comparison_data
+from utils.helpers import get_json_files_for_account, load_json_file ,format_json_data, format_comparison_data, create_comparison_lists, create_expandable_lists
 
 
 # =====================| DIRECTORIES |=====================
@@ -54,7 +58,7 @@ def main(page: ft.Page):
             file_selector.options = []
             files_found_text.value = f"❌ No se encontraron archivos para '{account_name}'"
             files_found_text.color = ft.Colors.RED_700
-        
+
         # Limpiar selección previa
         file_selector.value = None
         file_selector.update()
@@ -342,38 +346,6 @@ def main(page: ft.Page):
         analyze_file1_selector.update()
         analyze_file2_selector.update()
 
-    def create_comparison_lists(comparison):
-        """Crea las listas para mostrar en las pestañas de comparación"""
-        changes = comparison['changes']
-        relationships = comparison['current_relationships']
-        
-        # Nuevos seguidores
-        new_followers_text = "\n".join([f"• @{username}" for username in changes['new_followers']]) if changes['new_followers'] else "No hay nuevos seguidores"
-        
-        # Seguidores perdidos
-        lost_followers_text = "\n".join([f"• @{username}" for username in changes['lost_followers']]) if changes['lost_followers'] else "No se perdieron seguidores"
-        
-        # Nuevos seguidos
-        new_following_text = "\n".join([f"• @{username}" for username in changes['new_following']]) if changes['new_following'] else "No hay nuevos seguidos"
-        
-        # Dejó de seguir
-        unfollowed_text = "\n".join([f"• @{username}" for username in changes['unfollowed']]) if changes['unfollowed'] else "No dejó de seguir a nadie"
-        
-        # Seguimiento mutuo
-        mutual_follows_text = "\n".join([f"• @{username}" for username in relationships['mutual_follows']]) if relationships['mutual_follows'] else "No hay seguimiento mutuo"
-        
-        # Sigue pero no lo siguen
-        follows_not_followed_text = "\n".join([f"• @{username}" for username in relationships['follows_but_not_followed']]) if relationships['follows_but_not_followed'] else "Todos los que sigue lo siguen de vuelta"
-        
-        return {
-            'new_followers': new_followers_text,
-            'lost_followers': lost_followers_text,
-            'new_following': new_following_text,
-            'unfollowed': unfollowed_text,
-            'mutual_follows': mutual_follows_text,
-            'follows_not_followed': follows_not_followed_text
-        }
-
     def perform_comparison(e):
         """Realiza la comparación entre los dos archivos seleccionados"""
         account_name = analyze_account_name_field.value.strip()
@@ -433,7 +405,7 @@ def main(page: ft.Page):
                     border=ft.border.all(1, border_color),
                     height=300,
                 )
-            
+
             # Crear las pestañas con los diferentes análisis
             tabs_container = ft.Tabs(
                 selected_index=0,
@@ -466,7 +438,7 @@ def main(page: ft.Page):
                 ],
                 height=350
             )
-            
+
             # Actualizar contenedor de resultados
             analyze_results_container.content = ft.Column([
                 # Información de comparación
@@ -504,27 +476,6 @@ def main(page: ft.Page):
         page.clean()
         page.add(main_menu)
         page.update()
-
-    # =====================| Instagram functions |======================
-    
-
-    def create_expandable_lists(data):
-        followers = data.get('followers', [])
-        following = data.get('following', [])
-        
-        # Mostrar todos los seguidores (no solo preview)
-        if followers:
-            followers_text = "\n".join([f"• @{username}" for username in followers])
-        else:
-            followers_text = "No hay seguidores disponibles"
-        
-        # Mostrar todos los siguiendo (no solo preview)  
-        if following:
-            following_text = "\n".join([f"• @{username}" for username in following])
-        else:
-            following_text = "No hay usuarios seguidos disponibles"
-        
-        return followers_text, following_text
 
     def perform_data_mining(e):
         username = username_field.value.strip()
@@ -704,211 +655,51 @@ def main(page: ft.Page):
 
     # =====================| Load File Form Components |======================
     # Campo para el nombre de la cuenta
-    account_name_field = ft.TextField(
-        label="Nombre de la cuenta (sin @)",
-        hint_text="Ejemplo: mar_tz_ml",
-        width=300,
-        border_radius=8,
-        on_change=on_account_name_change,  # Se ejecuta cada vez que cambia el texto
-    )
+    account_name_field = account_name_field_component(on_account_name_change)
 
     # Texto para mostrar cuántos archivos se encontraron
-    files_found_text = ft.Text(
-        "Ingresa un nombre de cuenta para buscar archivos",
-        size=12,
-        color=ft.Colors.GREY_600
-    )
+    files_found_text = files_found_text_component()
 
     # Selector de archivos
-    file_selector = ft.Dropdown(
-        label="Seleccionar archivo",
-        width=300,
-        options=[],  # Se llena dinámicamente
-        border_radius=8,
-    )
+    file_selector = file_selector_component()
 
     # Contenedor de resultados para load file
-    load_results_container = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "Selecciona un archivo para ver los datos",
-                    size=16,
-                    color=ft.Colors.GREY_600,
-                    text_align=ft.TextAlign.CENTER,
-                )
-            ]
-        ),
-        width=500,
-        height=500,
-        padding=20,
-        border_radius=8,
-        bgcolor=ft.Colors.GREY_50,
-    )
+    load_results_container = load_results_container_component()
 
     # Formulario de load file
-    load_form_container = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "📁 Cargar Archivo",
-                    size=20,
-                    weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.GREEN_800,
-                ),
-                ft.Container(height=20),
-                account_name_field,
-                ft.Container(height=10),
-                files_found_text,
-                ft.Container(height=15),
-                file_selector,
-                ft.Container(height=20),
-                ft.ElevatedButton(
-                    "Cargar y Mostrar",
-                    on_click=load_and_display_file,
-                    width=300,
-                    height=45,
-                    bgcolor=ft.Colors.GREEN_600,
-                    color=ft.Colors.WHITE,
-                ),
-            ],
-        ),
-        width=350,
-        padding=20,
-        border_radius=8,
-        bgcolor=ft.Colors.WHITE,
+    load_form_container = load_form_container_component(
+        account_name_field,
+        files_found_text,
+        file_selector,
+        load_and_display_file
     )
     # =====================| Analyze Data Form Components |======================
     # Campo para el nombre de la cuenta
-    analyze_account_name_field = ft.TextField(
-        label="Nombre de la cuenta (sin @)",
-        hint_text="Ejemplo: mar_tz_ml",
-        width=300,
-        border_radius=8,
-        on_change=on_analyze_account_name_change,
-    )
+    analyze_account_name_field = analyze_account_name_field_component(on_analyze_account_name_change)
 
     # Texto para mostrar cuántos archivos se encontraron
-    analyze_files_found_text = ft.Text(
-        "Ingresa un nombre de cuenta para buscar archivos",
-        size=12,
-        color=ft.Colors.GREY_600
-    )
+    analyze_files_found_text = analyze_files_found_text_component()
 
     # Selector del primer archivo
-    analyze_file1_selector = ft.Dropdown(
-        label="Primer archivo (más antiguo)",
-        width=300,
-        options=[],
-        border_radius=8,
-    )
+    analyze_file1_selector = analyze_file1_selector_component()
 
     # Selector del segundo archivo
-    analyze_file2_selector = ft.Dropdown(
-        label="Segundo archivo (más reciente)",
-        width=300,
-        options=[],
-        border_radius=8,
-    )
+    analyze_file2_selector = analyze_file2_selector_component()
 
     # Contenedor de resultados para analyze data
-    analyze_results_container = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "Selecciona dos archivos para comparar los datos",
-                    size=16,
-                    color=ft.Colors.GREY_600,
-                    text_align=ft.TextAlign.CENTER,
-                )
-            ]
-        ),
-        width=500,
-        height=500,
-        padding=20,
-        border_radius=8,
-        bgcolor=ft.Colors.GREY_50,
-    )
+    analyze_results_container = analyze_results_container_component()
 
     # Formulario de analyze data
-    analyze_form_container = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "📊 Comparar Datos",
-                    size=20,
-                    weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.PURPLE_800,
-                ),
-                ft.Container(height=20),
-                analyze_account_name_field,
-                ft.Container(height=10),
-                analyze_files_found_text,
-                ft.Container(height=15),
-                analyze_file1_selector,
-                ft.Container(height=15),
-                analyze_file2_selector,
-                ft.Container(height=20),
-                ft.ElevatedButton(
-                    "Comparar Archivos",
-                    on_click=perform_comparison,
-                    width=300,
-                    height=45,
-                    bgcolor=ft.Colors.PURPLE_600,
-                    color=ft.Colors.WHITE,
-                ),
-            ],
-        ),
-        width=350,
-        padding=20,
-        border_radius=8,
-        bgcolor=ft.Colors.WHITE,
+    analyze_form_container = analyze_form_container_component(
+        analyze_account_name_field,
+        analyze_files_found_text,
+        analyze_file1_selector,
+        analyze_file2_selector,
+        perform_comparison
     )
 
     # =====================| Main Menu Layout |======================
-    main_menu = ft.Column(
-        [
-            ft.Text(
-                "Instagram Data Analyzer",
-                size=32,
-                weight=ft.FontWeight.BOLD,
-                text_align=ft.TextAlign.CENTER,
-            ),
-            ft.Container(height=30),
-            ft.Column(
-                [
-                    ft.ElevatedButton(
-                        "Data Mine",
-                        on_click=show_data_mine_section,
-                        width=200,
-                        height=50,
-                        color=ft.Colors.WHITE,
-                        bgcolor=ft.Colors.BLUE_500,
-                    ),
-                    ft.Container(height=15),
-                    ft.ElevatedButton(
-                        "Load File",
-                        on_click=show_load_file_section,
-                        width=200,
-                        height=50,
-                        bgcolor=ft.Colors.GREEN_500,
-                        color=ft.Colors.WHITE,
-                    ),
-                    ft.Container(height=15),
-                    ft.ElevatedButton(
-                        "Analyze Data",
-                        on_click=show_analyze_data_section,
-                        width=200,
-                        height=50,
-                        bgcolor=ft.Colors.PURPLE_500,
-                        color=ft.Colors.WHITE,
-                    ),
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
-        ],
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-    )
+    main_menu = main_menu_component(show_data_mine_section, show_load_file_section, show_analyze_data_section)
 
     # Show main menu initially
     page.add(main_menu)
