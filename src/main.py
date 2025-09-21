@@ -1,7 +1,14 @@
 import flet as ft
 from pathlib import Path
 
-from components.load_file_component import (
+from components.data_mining import (
+    form_container_component,
+    objective_field_component,
+    password_field_component,
+    results_container_component,
+    username_field_component,
+)
+from components.load_file import (
     account_name_field_component,
     file_selector_component,
     files_found_text_component,
@@ -659,70 +666,16 @@ def main(page: ft.Page):
 
     # =====================| Fields to data mining section |======================
     # Input fields
-    username_field = ft.TextField(
-        label="Username",
-        width=300,
-        border_radius=8,
-    )
-    password_field = ft.TextField(
-        label="Password",
-        password=True,
-        can_reveal_password=True,
-        width=300,
-        border_radius=8,
-    )
-    objective_field = ft.TextField(label="Objective", width=300, border_radius=8)
+    username_field = username_field_component()
+    password_field = password_field_component()
+    objective_field = objective_field_component()
 
     # Area to show results
-    results_container = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "Resultados aparecerán aquí",
-                    size=16,
-                    color=ft.Colors.GREY_600,
-                    text_align=ft.TextAlign.CENTER,
-                )
-            ]
-        ),
-        width=500,
-        height=500,
-        padding=20,
-        border_radius=8,
-        bgcolor=ft.Colors.GREY_50,
-    )
+    results_container = results_container_component()
 
     # Form to data mining
-    form_container = ft.Container(
-        content=ft.Column(
-            [
-                ft.Text(
-                    "🔍 Data Mining",
-                    size=20,
-                    weight=ft.FontWeight.BOLD,
-                    color=ft.Colors.BLUE_800,
-                ),
-                ft.Container(height=20),
-                username_field,
-                ft.Container(height=15),
-                password_field,
-                ft.Container(height=15),
-                objective_field,
-                ft.Container(height=20),
-                ft.ElevatedButton(
-                    "Enviar",
-                    on_click=perform_data_mining,
-                    width=300,
-                    height=45,
-                    bgcolor=ft.Colors.BLUE_600,
-                    color=ft.Colors.WHITE,
-                ),
-            ],
-        ),
-        width=350,
-        padding=20,
-        border_radius=8,
-        bgcolor=ft.Colors.WHITE,
+    form_container = form_container_component(
+        username_field, password_field, objective_field, perform_data_mining
     )
 
     # =====================| Load File Form Components |======================
